@@ -34,11 +34,20 @@ int main()
     // 创建几何圆（XY平面，半径50）
     gp_Ax2 axis(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1));            // 定义坐标系（原点，Z轴方向）
     gp_Circ circle(axis, 50.0);                               // 创建参数化圆
+    circle.SetLocation(gp_Pnt(0, 0, 0));                      // 设置圆心位置
     Handle(Geom_Circle) geomCircle = new Geom_Circle(circle); // 转换为几何曲线
 
     // 创建测试点
-    gp_Pnt point1(30, 40, 10); // 原始点1（不在圆平面上）
-    gp_Pnt point2(60, 0, 0);   // 原始点2（超出圆半径）
+    gp_Pnt point1(20, 40, 0); // 原始点1（在圆内部）
+    gp_Pnt point2(60, 0, 0);  // 原始点2（在圆外部）
+    std::cout << "Point 1: "
+              << point1.X() << ", "
+              << point1.Y() << ", "
+              << point1.Z() << std::endl;
+    std::cout << "Point 2: "
+              << point2.X() << ", "
+              << point2.Y() << ", "
+              << point2.Z() << std::endl;
 
     // 初始化投影器
     GeomAPI_ProjectPointOnCurve projector;
@@ -50,7 +59,23 @@ int main()
         std::cerr << "Error projecting point1" << std::endl;
         return 1;
     }
-    gp_Pnt projectedPoint1 = projector.NearestPoint(); // 获取最近投影点
+    gp_Pnt projectedPoint1 = projector.NearestPoint();                // 获取最近投影点
+    Standard_Real dist1 = projector.LowerDistance();                  // 最近距离
+    Standard_Real parameter1 = projector.Parameter(1);                // 获取投影点的参数值
+    std::cout << "Parameter of Point 1: " << parameter1 << std::endl; // 输出参数值
+    gp_Pnt pointOnCircle1 = geomCircle->Value(parameter1);            // 获取参数对应的点，应该与projectedPoint1相同
+    std::cout << "Point on Circle: "
+              << pointOnCircle1.X() << ", "
+              << pointOnCircle1.Y() << ", "
+              << pointOnCircle1.Z() << std::endl;
+
+    std::cout << "Projected Point 1: "
+              << projectedPoint1.X() << ", "
+              << projectedPoint1.Y() << ", "
+              << projectedPoint1.Z() << std::endl;
+
+    std::cout << "Distance to Point 1: "
+              << dist1 << std::endl;
 
     // 投影第二个点
     projector.Init(point2, geomCircle);
@@ -59,7 +84,23 @@ int main()
         std::cerr << "Error projecting point2" << std::endl;
         return 1;
     }
-    gp_Pnt projectedPoint2 = projector.NearestPoint();
+    gp_Pnt projectedPoint2 = projector.NearestPoint();                // 获取最近投影点
+    Standard_Real dist2 = projector.LowerDistance();                  // 最近距离
+    Standard_Real parameter2 = projector.Parameter(1);                // 获取投影点的参数值
+    std::cout << "Parameter of Point 2: " << parameter2 << std::endl; // 输出参数值
+    gp_Pnt pointOnCircle2 = geomCircle->Value(parameter2);            // 获取参数对应的点，应该与projectedPoint2相同
+    std::cout << "Point on Circle: "
+              << pointOnCircle2.X() << ", "
+              << pointOnCircle2.Y() << ", "
+              << pointOnCircle2.Z() << std::endl;
+
+    std::cout << "Projected Point 2: "
+              << projectedPoint2.X() << ", "
+              << projectedPoint2.Y() << ", "
+              << projectedPoint2.Z() << std::endl;
+
+    std::cout << "Distance to Point 2: "
+              << dist2 << std::endl;
 
     // 初始化可视化系统
     Handle(OpenGl_GraphicDriver) graphicDriver = new OpenGl_GraphicDriver(NULL); // OpenGL驱动
@@ -104,6 +145,8 @@ int main()
     Handle(WNT_Window) window = new WNT_Window(hwnd); // 创建Windows窗口
     Handle(V3d_View) view = viewer->CreateView();     // 创建3D视图
     view->SetWindow(window);                          // 关联窗口
+    view->SetProj(V3d_YnegZpos);                      // X轴正方向，Z轴负方向
+    view->SetTwist(0.0);                              // 消除视图旋转
     if (!window->IsMapped())                          // 检查窗口映射状态
     {
         window->Map(); // 映射窗口到屏幕
