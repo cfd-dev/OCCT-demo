@@ -4,7 +4,10 @@ project(DEMO_OCCT LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 
 # 构建可执行程序
-add_executable(${CMAKE_PROJECT_NAME} main.cpp)
+add_executable(${CMAKE_PROJECT_NAME} main2d.cpp)
+
+set(3d_target "${CMAKE_PROJECT_NAME}_3D")
+add_executable(${3d_target} main3d.cpp)
 
 # 设置VTK依赖库的路径
 set(VTK_DIR "C:/software/VTK/")
@@ -31,3 +34,4 @@ else()
 endif()
 
 target_link_libraries(${CMAKE_PROJECT_NAME} ${OpenCASCADE_LIBRARIES})
+target_link_libraries(${3d_target} ${OpenCASCADE_LIBRARIES} ${VTK_LIBRARIES})
