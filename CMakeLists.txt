@@ -36,6 +36,10 @@ else()
     # message(STATUS "OpenCASCADE libraries: ${OpenCASCADE_LIBRARIES}")
 endif()
 
+#开启OPENMP编译选项
+target_compile_options(${parallel_target} PRIVATE /openmp)
+add_definitions(-D_OPENMP)
+
 #设置TBB路径
 set(TBB_DIR "C:/software/Intel/oneAPI/tbb/2022.1/lib/cmake/tbb" CACHE PATH "path to TBB library.")
 find_package(TBB REQUIRED HINTS "${TBB_DIR}" NO_DEFAULT_PATH)
@@ -45,10 +49,6 @@ else()
     message(STATUS "TBB library version: ${TBB_VERSION}")
     message(STATUS "TBB library found at: ${TBB_DIR}")
 endif()
-
-#开启OPENMP编译选项
-target_compile_options(${parallel_target} PRIVATE /openmp)
-add_definitions(-D_OPENMP)
 
 #链接库和target
 target_link_libraries(${2d_target} ${OpenCASCADE_LIBRARIES} ${VTK_LIBRARIES})

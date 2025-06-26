@@ -15,6 +15,7 @@
 #include <tbb/task_arena.h>
 #include <tbb/enumerable_thread_specific.h>
 
+// 随机生成不在球面上的三维点
 void generate_random_points(std::vector<gp_Pnt> &points, int num_points, double min, double max, double sphere_radius)
 {
     std::mt19937 rng(42);
@@ -32,6 +33,7 @@ void generate_random_points(std::vector<gp_Pnt> &points, int num_points, double 
     }
 }
 
+// 串行投影（每次只构造一次projector，效率高）
 void project_points_serial_fast(const std::vector<gp_Pnt> &points, std::vector<gp_Pnt> &projected, const Handle(Geom_SphericalSurface) & sphere)
 {
     GeomAPI_ProjectPointOnSurf projector; // 只构造一次 projector，减少构造/析构开销，提高效率
@@ -42,6 +44,7 @@ void project_points_serial_fast(const std::vector<gp_Pnt> &points, std::vector<g
     }
 }
 
+// OpenMP并行投影（每线程只构造一次projector，效率高）
 void project_points_omp_fast(const std::vector<gp_Pnt> &points, std::vector<gp_Pnt> &projected, const Handle(Geom_SphericalSurface) & sphere, int num_threads)
 {
 #ifdef _OPENMP
@@ -61,6 +64,7 @@ void project_points_omp_fast(const std::vector<gp_Pnt> &points, std::vector<gp_P
 #endif
 }
 
+// TBB并行投影（每线程只构造一次projector，效率高）
 void project_points_tbb_fast(const std::vector<gp_Pnt> &points, std::vector<gp_Pnt> &projected, const Handle(Geom_SphericalSurface) & sphere, int num_threads)
 {
     tbb::enumerable_thread_specific<GeomAPI_ProjectPointOnSurf> ets_projector;
@@ -73,6 +77,7 @@ void project_points_tbb_fast(const std::vector<gp_Pnt> &points, std::vector<gp_P
             projected[i] = projector.NearestPoint(); }); });
 }
 
+// 串行投影（每次都构造新的projector，效率低，仅作对比）
 void project_points_serial(const std::vector<gp_Pnt> &points, std::vector<gp_Pnt> &projected, const Handle(Geom_SphericalSurface) & sphere)
 {
     for (size_t i = 0; i < points.size(); ++i)
@@ -82,6 +87,7 @@ void project_points_serial(const std::vector<gp_Pnt> &points, std::vector<gp_Pnt
     }
 }
 
+// OpenMP并行投影（每次都构造新的projector，效率低，仅作对比）
 void project_points_omp(const std::vector<gp_Pnt> &points, std::vector<gp_Pnt> &projected, const Handle(Geom_SphericalSurface) & sphere, int num_threads)
 {
 #ifdef _OPENMP
@@ -97,23 +103,28 @@ void project_points_omp(const std::vector<gp_Pnt> &points, std::vector<gp_Pnt> &
 #endif
 }
 
-void project_points_tbb(const std::vector<gp_Pnt> &points, std::vector<gp_Pnt> &projected, const Handle(Geom_SphericalSurface) & sphere, int num_threads)
+// TBB并行投影（每次都构造新的projector，效率低，仅作对比）
+void project_points_tbb(const std::vector<gp_Pnt> &points, 
+                        std::vector<gp_Pnt> &projected, 
+                        const Handle(Geom_SphericalSurface) & sphere, 
+                        int num_threads)
 {
     tbb::task_arena arena(num_threads);
-    arena.execute([&]
-                  { tbb::parallel_for(size_t(0), points.size(), [&](size_t i)
-                                      {
+    arena.execute([&] { 
+        tbb::parallel_for(size_t(0), points.size(), [&](size_t i) {
             GeomAPI_ProjectPointOnSurf projector(points[i], sphere);
-            projected[i] = projector.NearestPoint(); }); });
+            projected[i] = projector.NearestPoint(); 
+        }); 
+    });
 }
 
 int main()
 {
     int num_points = 8000000; // 点的数量，可调整
-    int num_threads = 16;     // 线程数，可调整
-    double sphere_radius = 50.0;
-
+    int num_threads = 12;     // 线程数，可调整
+    
     // 创建球面
+    double sphere_radius = 50.0;
     gp_Ax3 axis(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1));
     gp_Sphere sphere(axis, sphere_radius);
     Handle(Geom_SphericalSurface) geomSphere = new Geom_SphericalSurface(sphere);
@@ -149,7 +160,7 @@ int main()
     double omp_time = std::chrono::duration<double>(t2 - t1).count();
     std::cout << "OpenMP并行投影耗时: " << omp_time << " 秒" << std::endl;
 
-    // 检查TBB投影点是否在球面上
+    // 检查TBB投影点是否在球面上（根据球的解析表达式）
     int tbb_not_on_sphere = 0;
     for (const auto &pt : projected_tbb)
     {
@@ -173,7 +184,7 @@ int main()
     }
     std::cout << "OpenMP投影点不在球面上的数量: " << omp_not_on_sphere << std::endl;
 
-    // 验证结果一致性
+    // 验证并行投影与串行投影结果一致性
     int mismatch_tbb = 0, mismatch_omp = 0;
     for (int i = 0; i < num_points; ++i)
     {
@@ -190,7 +201,8 @@ int main()
     double omp_speedup = serial_time / omp_time;
     double tbb_efficiency = tbb_speedup / num_threads * 100.0;
     double omp_efficiency = omp_speedup / num_threads * 100.0;
-
+    
+    // 输出性能对比表格
     std::cout << "\n=================== 并行投影性能对比 ==============" << std::endl;
     std::cout << "方式      | 线程数 |   耗时(s) |  加速比 | 并行效率(%)" << std::endl;
     std::cout << "----------------------------------------------------" << std::endl;
